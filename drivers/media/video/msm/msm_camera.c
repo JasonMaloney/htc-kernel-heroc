@@ -32,7 +32,6 @@
 #include <mach/camera.h>
 #include <asm/cacheflush.h>
 #include <linux/rtc.h>
-DEFINE_MUTEX(hlist_mut);
 
 #define MSM_MAX_CAMERA_SENSORS 5
 
