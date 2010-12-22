@@ -33,6 +33,8 @@
 #include <asm/cacheflush.h>
 #include <linux/rtc.h>
 
+DEFINE_MUTEX(hlist_mut);
+
 #define MSM_MAX_CAMERA_SENSORS 5
 
 #define ERR_USER_COPY(to) pr_err("%s(%d): copy %s user\n", \
