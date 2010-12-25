@@ -60,6 +60,7 @@ struct battery_info_reply {
 	u32 full_bat;		/* Full capacity of battery (mAh) */
 	u32 full_level;		/* Full Level */
 	u32 over_vchg;		/* 0:normal, 1:over voltage charger */
+	s32 eval_current;	/* System loading current from ADC */
 };
 struct htc_battery_platform_data {
 	int (*func_show_batt_attr)(struct device_attribute *attr,
