@@ -472,9 +472,9 @@ static int htc_cable_status_update(int status)
 	update_wake_lock(status);
 	/*ARM9 report CHARGER_AC while plug in htc_adaptor which is identify by usbid*/
 	/*don't need to notify usb driver*/
-	if ((htc_batt_info.guage_driver == GUAGE_MODEM) && (status == CHARGER_AC)) {  
-		htc_set_smem_cable_type(CHARGER_USB);
-		power_supply_changed(&htc_power_supplies[CHARGER_USB]);
+	if ((htc_batt_info.guage_driver == GUAGE_MODEM) && (status == CHARGER_AC)) {
+		htc_set_smem_cable_type(CHARGER_AC);
+		power_supply_changed(&htc_power_supplies[CHARGER_AC]);
 	} else
 		msm_hsusb_set_vbus_state(!!htc_batt_info.rep.charging_source);
 
@@ -485,10 +485,9 @@ static int htc_cable_status_update(int status)
 
 	if (status == CHARGER_BATTERY) {
 		htc_set_smem_cable_type(CHARGER_BATTERY);
-		power_supply_changed(&htc_power_supplies[CHARGER_AC]);
-		htc_batt_info.rep.charging_source = CHARGER_AC;
+		power_supply_changed(&htc_power_supplies[CHARGER_BATTERY]);
 		if (htc_batt_debug_mask & HTC_BATT_DEBUG_UEVT)
-		BATT_LOG("batt:(htc_cable_status_update)power_supply_changed: AC");
+		BATT_LOG("batt:(htc_cable_status_update)power_supply_changed: battery");
 	}
 
 #else
@@ -710,12 +709,11 @@ static int htc_get_batt_info_smem(struct battery_info_reply *buffer)
 	buffer->batt_vol = smem_batt_info->batt_vol;
 	buffer->batt_temp = smem_batt_info->Temp;
 	buffer->batt_current = smem_batt_info->batt_current;
-	buffer->eval_current = smem_batt_info->eval_current;
 	/* Fix issue that recharging percent drop to 99%. */
 	/* The level in SMEM is for A9 internal use,
 	 * always use value reported by M2A level update RPC. */
 #if 0
-	buffer->level = smem_batt_info->percent_update;
+	buffer->level 	= smem_batt_info->percent_update;
 #endif
 	/* Move the rules of charging_source to cable_status_update. */
 	/* buffer->charging_source 	= be32_to_cpu(smem_batt_info->charging_source); */
@@ -726,10 +724,10 @@ static int htc_get_batt_info_smem(struct battery_info_reply *buffer)
 
 	if (htc_batt_debug_mask & HTC_BATT_DEBUG_SMEM)
 		BATT_LOG("SMEM_BATT: get_batt_info: batt_id=%d, batt_vol=%d, batt_temp=%d, "
-			"batt_current=%d, eval_current=%d, level=%d, charging_source=%d, "
+			"batt_current=%d, level=%d, charging_source=%d, "
 			"charging_enabled=%d, full_bat=%d, over_vchg=%d",
 			buffer->batt_id, buffer->batt_vol, buffer->batt_temp,
-			buffer->batt_current, buffer->eval_current, buffer->level, buffer->charging_source,
+			buffer->batt_current, buffer->level, buffer->charging_source,
 			buffer->charging_enabled, buffer->full_bat, buffer->over_vchg);
 
 	return 0;
@@ -927,35 +925,32 @@ static int htc_battery_get_charging_status(void)
 		charger = CHARGER_UNKNOWN;
 
 	switch (charger) {
-		case CHARGER_BATTERY:
+	case CHARGER_BATTERY:
 		htc_charge_full = 0;
-			ret = POWER_SUPPLY_STATUS_NOT_CHARGING;
-				break;
-		case CHARGER_USB:
-		case CHARGER_AC:
-		if ((htc_charge_full) && (htc_batt_info.rep.full_level == 100)) {
+		ret = POWER_SUPPLY_STATUS_NOT_CHARGING;
+		break;
+	case CHARGER_USB:
+	case CHARGER_AC:
+		if (htc_charge_full){
 			htc_batt_info.rep.level = 100;
 		}
-		smem_batt_info->charging_enabled = htc_batt_info.rep.charging_enabled;
+
 		level = htc_batt_info.rep.level;
-
-		if ((level == 100) && (htc_batt_info.rep.batt_vol >= 4193))
-			htc_charge_full = 1;
-
-		if (htc_charge_full) {
+		if (level == 100){
+			htc_charge_full = 1;}
+		if (htc_charge_full)
 			ret = POWER_SUPPLY_STATUS_FULL;
-		} else if ((htc_batt_info.rep.charging_enabled != 0) && (level <= 99))
+		else if (htc_batt_info.rep.charging_enabled != 0)
 			ret = POWER_SUPPLY_STATUS_CHARGING;
 		else
-			ret = POWER_SUPPLY_STATUS_CHARGING;
+			ret = POWER_SUPPLY_STATUS_DISCHARGING;
 		break;
-		default:
-			ret = POWER_SUPPLY_STATUS_UNKNOWN;
-		}
-		mutex_unlock(&htc_batt_info.lock);
-		return ret;
-		}
-
+	default:
+		ret = POWER_SUPPLY_STATUS_UNKNOWN;
+	}
+	mutex_unlock(&htc_batt_info.lock);
+	return ret;
+}
 
 static int htc_battery_get_property(struct power_supply *psy,
 				    enum power_supply_property psp,
@@ -1159,7 +1154,6 @@ static ssize_t htc_battery_set_full_level(struct device *dev,
 	switch (htc_batt_info.guage_driver) {
 	case GUAGE_MODEM:
 		mutex_lock(&htc_batt_info.rpc_lock);
-		htc_batt_info.rep.full_level = percent;
 		rc = htc_rpc_set_full_level(percent);
 		mutex_unlock(&htc_batt_info.rpc_lock);
 		break;
@@ -1410,39 +1404,23 @@ static int handle_battery_call(struct msm_rpc_server *server,
 {
 	switch (req->procedure) {
 	case RPC_BATT_MTOA_NULL:
-	return 0;
+		return 0;
 
 	case RPC_BATT_MTOA_SET_CHARGING_PROC: {
 		struct rpc_batt_mtoa_set_charging_args *args;
 		args = (struct rpc_batt_mtoa_set_charging_args *)(req + 1);
 		args->enable = be32_to_cpu(args->enable);
-
-		if ((htc_batt_info.charger == LINEAR_CHARGER) && (htc_batt_info.rep.level == 100) && (htc_batt_info.rep.batt_vol >= 4228)) {
-			if ((args->enable == 2) || (args->enable == 1) || (args->enable == 0) || (args->enable == 100))
-				args->enable = 0;
-		} else
-				args->enable = 2;
-		if ((htc_batt_info.charger == SWITCH_CHARGER) && (htc_batt_info.rep.level == 100) && (htc_batt_info.rep.batt_vol >= 4228)) {
-			if ((args->enable == 1) || (args->enable == 2) || (args->enable == 100))
-				args->enable = 0;
-		} else
-				args->enable = 2;
-
-		if (htc_batt_info.rep.level == 100) {
-			if ((htc_batt_info.rep.batt_current <= 5) || (htc_batt_info.rep.eval_current <= 700))
-				args->enable = 2;
-		}
-
-
 		if (htc_batt_debug_mask & HTC_BATT_DEBUG_M2A_RPC)
 			BATT_LOG("M2A_RPC: set_charging: %d", args->enable);
 		if (htc_batt_info.charger == SWITCH_CHARGER)
-			blocking_notifier_call_chain(&cable_status_notifier_list,
-			args->enable, NULL);
+		blocking_notifier_call_chain(&cable_status_notifier_list,
+		args->enable, NULL);
+		else {
+			htc_battery_set_charging(args->enable);
+			}
 		return 0;
-		}
-		
-		case RPC_BATT_MTOA_CABLE_STATUS_UPDATE_PROC: {
+	}
+	case RPC_BATT_MTOA_CABLE_STATUS_UPDATE_PROC: {
 		struct rpc_batt_mtoa_cable_status_update_args *args;
 		args = (struct rpc_batt_mtoa_cable_status_update_args *)(req + 1);
 		args->status = be32_to_cpu(args->status);
@@ -1453,8 +1431,6 @@ static int handle_battery_call(struct msm_rpc_server *server,
 		if (machine_is_incrediblec() && args->status == CHARGER_AC)
 			args->status = CHARGER_USB;
 #endif
-		if (machine_is_heroc() && args->status == CHARGER_AC)
-		args->status = CHARGER_USB;	
 		htc_cable_status_update(args->status);
 		return 0;
 	}
