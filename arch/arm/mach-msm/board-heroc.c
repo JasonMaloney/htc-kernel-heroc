@@ -61,6 +61,10 @@
 #include "board-heroc.h"
 #include "board-heroc-camsensor.h"
 
+#ifdef CONFIG_USB_ANDROID
+#include "board-heroc-gadget.h"
+#endif
+
 static struct htc_battery_platform_data htc_battery_pdev_data = {
 //	.gpio_mbat_in = HERO_GPIO_MBAT_IN,
 //	.gpio_mchg_en_n = HERO_GPIO_MCHG_EN_N,
@@ -409,7 +413,7 @@ static struct platform_device msm_camera_sensor_s5k3e2fx = {
 		.platform_data = &msm_camera_sensor_s5k3e2fx_data,
 	},
 };
-
+#ifndef 
 static void heroc_phy_reset(void)
 {
 	printk("heroc_phy_reset\n");
@@ -960,10 +964,20 @@ static void __init heroc_init(void)
 	msm_add_serial_devices(MSM_SERIAL_UART3);
 
 	msm_register_usb_phy_init_seq(heroc_phy_init_seq);
+
+#ifdef CONFIG_USB_FUNCTION
+	msm_register_usb_phy_init_seq(heroc_gadget_phy_init_seq);	
+	msm_hsusb_set_product(usb_products,
+		ARRAY_SIZE(usb_products));
+	msm_add_usb_devices(heroc_gadget_phy_reset, NULL);
+
+#else
+	msm_register_usb_phy_init_seq(heroc_phy_init_seq);
 	msm_hsusb_set_product(heroc_usb_products,
 		ARRAY_SIZE(heroc_usb_products));
 
 	msm_add_usb_devices(heroc_phy_reset, NULL);
+#endif
 
 	msm_add_mem_devices(&pmem_setting);
 
@@ -975,6 +989,10 @@ static void __init heroc_init(void)
 
 	msm_device_i2c.dev.platform_data = &heroc_i2c_device_data;
 	platform_add_devices(devices, ARRAY_SIZE(devices));
+
+#ifdef CONFIG_USB_DEVICES
+	heroc_add_gadget_usb_devices()
+#endif
 
 	for (rc=0;rc<ARRAY_SIZE(i2c_devices);rc++){
             if (!strcmp(i2c_devices[rc].type,AKM8973_I2C_NAME)){
