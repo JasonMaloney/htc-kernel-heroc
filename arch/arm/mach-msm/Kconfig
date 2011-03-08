@@ -549,6 +549,13 @@ config MSM_CPU_FREQ_SCREEN_ON
 
 endif # MSM_CPU_FREQ_SCREEN
 
+config MSM_CPU_FREQ_SET_MIN_MAX
+        bool "Set Min/Max CPU frequencies."
+        default n
+        help
+	  Allow setting min and max CPU frequencies. Sysfs can be used
+	  to override these values.
+
 config MSM_CPU_FREQ_ONDEMAND_MAX
 	int "Max"
 	default 384000

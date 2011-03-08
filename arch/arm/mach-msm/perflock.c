@@ -138,7 +138,7 @@ static int __init perflock_screen_policy_init(void)
 late_initcall(perflock_screen_policy_init);
 #endif
 
-#if 0
+#if MSM_CPU_FREQ_SET_MIN_MAX
 static unsigned int policy_min = CONFIG_MSM_CPU_FREQ_ONDEMAND_MIN;
 static unsigned int policy_max = CONFIG_MSM_CPU_FREQ_ONDEMAND_MAX;
 #else
